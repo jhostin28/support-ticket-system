@@ -5,6 +5,7 @@
 // Node can serve HTTP on its own, but Express handles the repetitive parts:
 // reading the URL and method, parsing the body, building the response.
 import express from 'express';
+import './db.js';
 
 // express is a function. Calling it returns an application object,
 // which is what routes and middleware get attached to.
