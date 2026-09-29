@@ -7,7 +7,10 @@ import * as authService from '../services/auth.js';
 
 // POST /auth/login — verify credentials and hand back a token.
 export async function login(req, res) {
-  const { email, password } = req.body;
+    // || {} guards against a request with no body at all. Without it,
+    // destructuring undefined throws before the validation below ever runs, and
+    // the client gets a 500 instead of a clear 400.
+   const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({ error: 'email and password are required' });

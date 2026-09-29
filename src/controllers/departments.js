@@ -13,6 +13,7 @@
 // function comes from.
 import * as departmentsService from '../services/departments.js';
 
+
 // GET /departments — list every department.
 export async function list(req, res) {
   try {
@@ -36,7 +37,11 @@ export async function create(req, res) {
   // and create a variable with that same name. The short form of
   // const name = req.body.name — which pays off with several fields at once:
   // const { name, email, password } = req.body
-  const { name } = req.body;
+
+  // || {} guards against a request with no body at all. Without it,
+  // destructuring undefined throws before the validation below ever runs, and
+  // the client gets a 500 instead of a clear 400.
+  const { name } = req.body || {};
 
   // Validate before touching the database. The NOT NULL constraint would
   // catch a missing name anyway, but by then the error is a database error:

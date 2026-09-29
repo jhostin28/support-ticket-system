@@ -9,7 +9,7 @@ import * as usersService from '../services/users.js';
 export async function create(req, res) {
   // Destructuring pays off here: one line instead of five separate
   // req.body.something reads.
-  const { name, email, password, role, departmentId } = req.body;
+  const { name, email, password, role, departmentId } = req.body || {};;
 
   // || means "or", so this rejects if ANY required field is missing.
   //
