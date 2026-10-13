@@ -17,6 +17,7 @@ import departmentsRouter from './routes/departments.js';
 import usersRouter from './routes/users.js';
 import authRouter from './routes/auth.js';
 import clientsRouter from './routes/clients.js';
+import ticketsRouter from './routes/tickets.js';
 
 // express is a function. Calling it returns an application object,
 // which is what routes and middleware get attached to.
@@ -62,6 +63,7 @@ app.get('/health', (req, res) => {
 app.use('/api/departments', departmentsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/clients' , clientsRouter);
+app.use('/api/tickets' , ticketsRouter);
 
 // auth is not a resource like the two above, it is a group of actions, so the
 // router names each path itself: src/routes/auth.js declares '/login', which

@@ -59,6 +59,7 @@ CREATE TABLE tickets (
     resolved_at   TIMESTAMPTZ,
     closed_at     TIMESTAMPTZ,
     client_id     INTEGER         NOT NULL REFERENCES clients(id),
+    author_id     INTEGER         NOT NULL REFERENCES users(id),
     user_id       INTEGER         REFERENCES users(id),
     department_id INTEGER         NOT NULL REFERENCES departments(id)
 );

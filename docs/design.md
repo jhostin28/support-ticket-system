@@ -49,8 +49,14 @@ The support case itself.
 | `resolved_at` | `TIMESTAMPTZ` | | NULL | |
 | `closed_at` | `TIMESTAMPTZ` | | NULL | |
 | `client_id` | `INTEGER` | FK → `clients` | NOT NULL | |
+| `author_id` | `INTEGER` | FK → `users` | NOT NULL | |
 | `user_id` | `INTEGER` | FK → `users` | NULL | |
 | `department_id` | `INTEGER` | FK → `departments` | NOT NULL | |
+
+**`author_id` and `user_id` are separate.** `author_id` is the agent who opened
+the ticket and never changes. `user_id` is who has it now, and changes when a
+ticket is reassigned — a dropped call leaves it `NULL`, and the next agent who
+takes the case claims it. One column could not answer both questions.
 
 **`title` is `VARCHAR(200)`, `description` is `TEXT`.** A title has a real business
 reason to stay short: it has to fit in a queue list. A description does not, and
