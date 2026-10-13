@@ -63,3 +63,23 @@ export async function findByEmail(email) {
   );
   return result.rows[0];
 }
+
+// Find one user by id.
+//
+// Used when creating a ticket: the new ticket goes into the agent's current
+// department, and that is looked up here rather than read from the JWT.
+//
+// The token carries userId and role because those are stable. A department can
+// change — move an agent from Tier 1 to Billing and their existing token would
+// keep saying Tier 1 until it expires, up to 24 hours later. The rule: what is
+// stable goes in the token, what changes gets looked up.
+//
+// Columns are listed rather than SELECT *, since this result can reach a
+// controller and password_hash has no business travelling further.
+export async function findById(id) {
+  const result = await pool.query(
+    'SELECT id, name, email, role, department_id, is_active FROM users WHERE id = $1',
+    [id]
+  );
+  return result.rows[0];
+}
