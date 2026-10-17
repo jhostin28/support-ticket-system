@@ -32,3 +32,43 @@ export async function create({ title, description, priority, clientId, authorId,
 
   return result.rows[0];
 }
+
+
+// List tickets, optionally filtered.
+//
+// The SQL is built up piece by piece because the filters are optional: a
+// request may send none, one, or all three.
+export async function getAll({ status, departmentId, clientId } = {}) {
+  // Start with a condition that is always true, so every filter below can be
+  // appended with AND without checking whether it is the first one.
+  const conditions = ['1 = 1'];
+  const values = [];
+
+  // Each filter adds its condition AND its value, keeping the $n numbers in
+  // step with the array. values.length + 1 is the next placeholder number.
+  if (status) {
+    values.push(status);
+    conditions.push(`status = $${values.length}`);
+  }
+
+  if (departmentId) {
+    values.push(departmentId);
+    conditions.push(`department_id = $${values.length}`);
+  }
+
+  if (clientId) {
+    values.push(clientId);
+    conditions.push(`client_id = $${values.length}`);
+  }
+
+  const result = await pool.query(
+    // High priority first, then oldest first within the same priority, so an
+    // old low-priority ticket does not sit forgotten forever.
+    `SELECT * FROM tickets
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY priority DESC, created_at ASC`,
+    values
+  );
+
+  return result.rows;
+}

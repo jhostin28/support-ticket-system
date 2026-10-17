@@ -66,3 +66,28 @@ export async function create(req, res) {
     res.status(500).json({ error: 'internal server error' });
   }
 }
+
+// GET /tickets — list tickets, optionally filtered by query parameters.
+//
+// Query parameters are what comes after the ? in the URL:
+//   /api/tickets?status=pending&departmentId=1
+//
+// Express puts them in req.query. They are optional by nature: none, one or
+// all three. Sending none returns every ticket.
+export async function list(req, res) {
+  const { status, departmentId, clientId } = req.query;
+
+  try {
+    const tickets = await ticketsService.getAll({ status, departmentId, clientId });
+    res.json(tickets);
+  } catch (err) {
+    // 22P02 — invalid input for a type. Here: a status outside the ENUM's
+    // list, or a departmentId that is not a number.
+    if (err.code === '22P02') {
+      return res.status(400).json({ error: 'invalid filter value' });
+    }
+
+    console.error(err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+}
