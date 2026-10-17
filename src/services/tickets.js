@@ -72,3 +72,12 @@ export async function getAll({ status, departmentId, clientId } = {}) {
 
   return result.rows;
 }
+
+// Find one ticket by id.
+//
+// Returns undefined when nothing matches — not an error, just an answer. The
+// controller turns that into a 404.
+export async function findById(id) {
+  const result = await pool.query('SELECT * FROM tickets WHERE id = $1', [id]);
+  return result.rows[0];
+}
