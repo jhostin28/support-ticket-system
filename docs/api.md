@@ -324,8 +324,7 @@ not exist yet.
 `updated_at` is refreshed by a database trigger on every update, whatever the
 change.
 
-`department_id` is not updatable here. Escalating also has to record who moved
-the ticket and from where, so it gets its own endpoint — phase 3.
+`department_id` is not updatable here — escalating has its own endpoint below.
 
 **Response `200`** — the updated ticket.
 
@@ -337,6 +336,92 @@ the ticket and from where, so it gets its own endpoint — phase 3.
 | `401` | No token, or the token is invalid or expired |
 | `404` | No ticket with that id |
 | `409` | The ticket is closed, and a closed ticket cannot be modified |
+
+### `POST /api/tickets/:id/escalate` — **Auth**
+
+Moves a ticket to another department and records the move.
+
+A business action rather than CRUD, which is why the URL carries a verb. It
+runs in a transaction: the ticket's department changes **and** a row lands in
+`ticket_escalations`, or neither happens. A ticket sitting in a department
+with no record of how it got there would make the history lie.
+
+**Body**
+
+```json
+{ "toDepartmentId": 2 }
+```
+
+The department it came from, and who moved it, are taken from the ticket and
+the token — not from the request.
+
+**Response `200`** — the updated ticket.
+
+**Errors**
+
+| Status | When |
+|---|---|
+| `400` | `toDepartmentId` missing, or that department does not exist |
+| `401` | No token, or the token is invalid or expired |
+| `404` | No ticket with that id |
+| `409` | The ticket is closed, or it is already in that department |
+
+---
+
+## Comments
+
+Notes added to a case over time. A nested resource: a comment belongs to a
+ticket, so there is no top-level `/api/comments`.
+
+Comments cannot be edited or deleted. They are a record of what happened.
+
+### `GET /api/tickets/:ticketId/comments` — **Auth**
+
+Oldest first — a case history read backwards makes no sense.
+
+**Response `200`**
+
+```json
+[
+  {
+    "id": 1,
+    "body": "Customer confirms the problem persists.",
+    "created_at": "2026-10-17T04:21:31.339Z",
+    "ticket_id": 2,
+    "user_id": 1
+  }
+]
+```
+
+**Errors**
+
+| Status | When |
+|---|---|
+| `400` | The ticket id is not a number |
+| `401` | No token, or the token is invalid or expired |
+| `404` | No ticket with that id |
+
+### `POST /api/tickets/:ticketId/comments` — **Auth**
+
+**Body**
+
+```json
+{ "body": "Customer confirms the problem persists." }
+```
+
+The author comes from the token — nobody writes a note in another agent's
+name.
+
+**Response `201`** — the created comment.
+
+**Errors**
+
+| Status | When |
+|---|---|
+| `400` | `body` missing, or the ticket id is not a number |
+| `401` | No token, or the token is invalid or expired |
+| `404` | No ticket with that id |
+| `409` | The ticket is closed, and a closed ticket takes no new comments |
 
 ---
 
