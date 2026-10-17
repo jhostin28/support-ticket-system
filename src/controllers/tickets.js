@@ -91,3 +91,38 @@ export async function list(req, res) {
     res.status(500).json({ error: 'internal server error' });
   }
 }
+
+// GET /tickets/:id — fetch one ticket.
+//
+// The :id in the route is a path parameter — a slot that takes its value from
+// the URL. A request to /api/tickets/5 leaves req.params.id as "5".
+//
+// Note it arrives as a string, not a number. PostgreSQL casts it for the
+// comparison, so no conversion is needed here.
+export async function getOne(req, res) {
+  const { id } = req.params;
+
+  try {
+    const ticket = await ticketsService.findById(id);
+
+    // undefined from the service means no row matched. 404 is right because
+    // this request is a lookup — asking for something that is not there.
+    //
+    // Compare with POST: creating a department that does not exist yet is the
+    // normal case and answers 201. What changes is the intent of the request.
+    if (!ticket) {
+      return res.status(404).json({ error: 'ticket not found' });
+    }
+
+    res.json(ticket);
+  } catch (err) {
+    // 22P02 — invalid input for the type. Here: an id that is not a number,
+    // such as /api/tickets/abc.
+    if (err.code === '22P02') {
+      return res.status(400).json({ error: 'invalid ticket id' });
+    }
+
+    console.error(err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+}
