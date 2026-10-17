@@ -81,3 +81,39 @@ export async function findById(id) {
   const result = await pool.query('SELECT * FROM tickets WHERE id = $1', [id]);
   return result.rows[0];
 }
+
+// Update one ticket.
+//
+// Built dynamically because PATCH means partial: only the fields actually
+// sent get touched. Sending just a status must not blank out the title.
+//
+// Returns undefined if no ticket has that id.
+export async function update(id, fields) {
+  const sets = [];
+  const values = [];
+
+  // Each field that was sent adds its own "column = $n" and its value,
+  // keeping the numbering in step with the array.
+  for (const [column, value] of Object.entries(fields)) {
+    values.push(value);
+    sets.push(`${column} = $${values.length}`);
+  }
+
+  // Nothing to update.
+  if (sets.length === 0) {
+    return findById(id);
+  }
+
+  // The id goes last, after all the field values.
+  values.push(id);
+
+  const result = await pool.query(
+    `UPDATE tickets
+     SET ${sets.join(', ')}
+     WHERE id = $${values.length}
+     RETURNING *`,
+    values
+  );
+
+  return result.rows[0];
+}
