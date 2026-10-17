@@ -85,3 +85,29 @@ CREATE TABLE ticket_escalations (
     user_id            INTEGER     NOT NULL REFERENCES users(id),
     moved_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ---------------------------------------------------------------------------
+-- Triggers
+-- ---------------------------------------------------------------------------
+
+-- Keep tickets.updated_at current.
+--
+-- DEFAULT NOW() only fires on INSERT, so without this the column would hold
+-- the creation time forever. Doing it in the backend instead would mean every
+-- UPDATE has to remember to set it — and an update run straight from psql or
+-- pgAdmin would skip it entirely. In the database it cannot be bypassed.
+--
+-- NEW is the row as it will be after the UPDATE; BEFORE lets the function
+-- change it before it is written.
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tickets_set_updated_at
+BEFORE UPDATE ON tickets
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
