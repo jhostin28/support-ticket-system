@@ -28,5 +28,7 @@ router.patch('/:id', requireAuth, ticketsController.update);
 // clearly — req.params.ticketId says what it holds.
 router.get('/:ticketId/comments', requireAuth, commentsController.list);
 router.post('/:ticketId/comments', requireAuth, commentsController.create);
+// Not CRUD: a business action, so the URL carries a verb.
+router.post('/:id/escalate', requireAuth, ticketsController.escalate);
 
 export default router;
