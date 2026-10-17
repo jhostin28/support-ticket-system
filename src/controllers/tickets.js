@@ -126,3 +126,74 @@ export async function getOne(req, res) {
     res.status(500).json({ error: 'internal server error' });
   }
 }
+
+// PATCH /tickets/:id — update one ticket.
+//
+// PATCH, not PUT: only the fields sent get changed. PUT would mean replacing
+// the whole resource, blanking out anything left out.
+//
+// What cannot be changed here:
+// - author_id and created_at: facts about the past.
+// - department_id: escalating also has to record who moved it and where from,
+//   so it gets its own endpoint with a transaction. Phase 3.
+// - user_id directly: an agent claims a ticket for themselves with
+//   { "claim": true }. Assigning someone else is a supervisor action, phase 4.
+export async function update(req, res) {
+  const { id } = req.params;
+  const { title, description, status, priority, claim } = req.body || {};
+
+  try {
+    const existing = await ticketsService.findById(id);
+
+    if (!existing) {
+      return res.status(404).json({ error: 'ticket not found' });
+    }
+
+    // A closed ticket is final — the rule this system took from how support
+    // actually worked. Enforced here rather than in the database because it
+    // depends on the ticket's previous state, which a CHECK constraint
+    // cannot see.
+    if (existing.status === 'closed') {
+      return res.status(409).json({ error: 'a closed ticket cannot be modified' });
+    }
+
+    // Only the fields that were actually sent end up in this object. The
+    // column names come from this code, never from the request — the service
+    // interpolates them into the SQL, so letting the client name columns
+    // would be an injection hole.
+    const fields = {};
+
+    if (title !== undefined) fields.title = title;
+    if (description !== undefined) fields.description = description;
+    if (priority !== undefined) fields.priority = priority;
+    if (claim === true) fields.user_id = req.user.id;
+
+    if (status !== undefined) {
+      fields.status = status;
+
+      // Timestamps follow the status instead of being sent by the client.
+      // Otherwise an agent could mark a ticket resolved with a date from last
+      // week, and the resolution-time numbers would be fiction.
+      //
+      // Only set once: a ticket that goes back to in_progress and is resolved
+      // again keeps its first resolution time.
+      if (status === 'resolving' && !existing.resolved_at) {
+        fields.resolved_at = new Date();
+      }
+
+      if (status === 'closed' && !existing.closed_at) {
+        fields.closed_at = new Date();
+      }
+    }
+
+    const ticket = await ticketsService.update(id, fields);
+    res.json(ticket);
+  } catch (err) {
+    if (err.code === '22P02') {
+      return res.status(400).json({ error: 'invalid value for status, priority or id' });
+    }
+
+    console.error(err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+}

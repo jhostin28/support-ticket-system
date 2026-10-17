@@ -15,5 +15,6 @@ const router = Router();
 router.get('/', requireAuth, ticketsController.list);
 router.get('/:id', requireAuth, ticketsController.getOne);
 router.post('/', requireAuth, ticketsController.create);
+router.patch('/:id', requireAuth, ticketsController.update);
 
 export default router;
