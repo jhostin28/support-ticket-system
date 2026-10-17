@@ -12,6 +12,7 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
+router.get('/', requireAuth, ticketsController.list);
 router.post('/', requireAuth, ticketsController.create);
 
 export default router;
