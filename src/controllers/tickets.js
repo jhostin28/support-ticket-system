@@ -197,3 +197,57 @@ export async function update(req, res) {
     res.status(500).json({ error: 'internal server error' });
   }
 }
+
+// POST /tickets/:id/escalate — move a ticket to another department.
+//
+// Not part of PATCH, and not CRUD: escalating is a business action with its
+// own rules, and it writes to two tables at once. The URL carries a verb for
+// that reason.
+export async function escalate(req, res) {
+  const { id } = req.params;
+  const { toDepartmentId } = req.body || {};
+
+  if (!toDepartmentId) {
+    return res.status(400).json({ error: 'toDepartmentId is required' });
+  }
+
+  try {
+    const ticket = await ticketsService.findById(id);
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'ticket not found' });
+    }
+
+    if (ticket.status === 'closed') {
+      return res.status(409).json({ error: 'a closed ticket cannot be escalated' });
+    }
+
+    // Escalating to the department it is already in is not a real move, and
+    // allowing it would fill the history with meaningless rows.
+    if (Number(toDepartmentId) === ticket.department_id) {
+      return res.status(409).json({ error: 'the ticket is already in that department' });
+    }
+
+    const updated = await ticketsService.escalate({
+      ticketId: id,
+      toDepartmentId,
+      // Where it is NOW becomes where it came from.
+      fromDepartmentId: ticket.department_id,
+      // Who did it — from the token, as always.
+      userId: req.user.id,
+    });
+
+    res.json(updated);
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(400).json({ error: 'that department does not exist' });
+    }
+
+    if (err.code === '22P02') {
+      return res.status(400).json({ error: 'invalid id' });
+    }
+
+    console.error(err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+}

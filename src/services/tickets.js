@@ -117,3 +117,51 @@ export async function update(id, fields) {
 
   return result.rows[0];
 }
+
+// Escalate a ticket to another department.
+//
+// Two operations that have to happen together: change the ticket's department
+// AND record who moved it and from where. One without the other leaves the
+// data lying — a ticket in Billing with no trace of how it got there.
+//
+// Unlike every other function here, this one does not use pool.query(). A
+// transaction has to run on a SINGLE connection: BEGIN and COMMIT live on that
+// connection, and the pool would hand out a different one each call.
+export async function escalate({ ticketId, toDepartmentId, fromDepartmentId, userId }) {
+  // Borrow one connection from the pool and hold it for the whole transaction.
+  const client = await pool.connect();
+
+  try {
+    // Nothing below is written for real until COMMIT.
+    await client.query('BEGIN');
+
+    const updated = await client.query(
+      `UPDATE tickets
+       SET department_id = $1
+       WHERE id = $2
+       RETURNING *`,
+      [toDepartmentId, ticketId]
+    );
+
+    await client.query(
+      `INSERT INTO ticket_escalations
+         (ticket_id, from_department_id, to_department_id, user_id)
+       VALUES ($1, $2, $3, $4)`,
+      [ticketId, fromDepartmentId, toDepartmentId, userId]
+    );
+
+    // Both succeeded — make it permanent.
+    await client.query('COMMIT');
+
+    return updated.rows[0];
+  } catch (err) {
+    // Anything failed — undo everything, including the UPDATE that already
+    // ran. The database goes back to how it was before BEGIN.
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    // Always return the connection to the pool, success or failure. Without
+    // this the pool leaks connections and eventually runs out.
+    client.release();
+  }
+}
