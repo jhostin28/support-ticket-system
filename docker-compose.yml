@@ -1,0 +1,68 @@
+# Runs the whole system: the API and its database, together.
+#
+# The Dockerfile builds one image. This file orchestrates several containers
+# and the network between them, so the project starts with:
+#
+#   docker compose up
+
+services:
+  # The database. No Dockerfile needed — the official Postgres image already
+  # does everything required.
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: support_ticket_system
+    ports:
+      # host:container. Mapped to 5433 on the host so it does not clash with
+      # the PostgreSQL already running on 5432 on this machine.
+      - '5433:5432'
+    volumes:
+      # Without this, the data dies with the container. A named volume keeps
+      # it across restarts.
+      
+      # Postgres 18 changed this: the mount goes one level up, at
+      # /var/lib/postgresql, and the image creates a version-specific
+      # subdirectory inside. Mounting at /data as earlier versions did makes
+      # the container refuse to start.
+      - postgres_data:/var/lib/postgresql
+      # Anything in this folder runs automatically the first time the database
+      # is created — which is how the schema gets applied with no manual step.
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      # The API must not start before the database is ready to accept
+      # connections. This is what makes depends_on below actually wait.
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # The API, built from the Dockerfile in this directory.
+  api:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      # DB_HOST is "db", not localhost. Inside the compose network each
+      # service is reachable by its name — this is the piece that usually
+      # confuses people. From the container's point of view, localhost is
+      # itself, not the host machine.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: support_ticket_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PORT: 3000
+      # Read from the host's shell or .env file rather than written here, so
+      # the real secret never lands in a file that goes to the repo.
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 24h
+    depends_on:
+      db:
+        # Waits for the healthcheck to pass, not just for the container to
+        # exist. Without this the API starts first and fails to connect.
+        condition: service_healthy
+
+volumes:
+  postgres_data:
