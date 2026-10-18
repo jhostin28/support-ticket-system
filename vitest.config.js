@@ -13,5 +13,12 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
     setupFiles: ['./tests/setup.js'],
+    // Run test files one at a time, not in parallel.
+    //
+    // By default vitest runs files concurrently for speed. These tests all
+    // share one database: one file truncates while another is mid-seed, and
+    // both break. Slower, but the only way for database tests to be reliable
+    // without a separate database per file.
+    fileParallelism: false,
   },
 });
