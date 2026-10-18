@@ -5,6 +5,7 @@
 
 import * as commentsService from '../services/comments.js';
 import * as ticketsService from '../services/tickets.js';
+import { canActOnTicket } from '../middleware/permissions.js';
 
 // C — POST /tickets/:ticketId/comments
 export async function create(req, res) {
@@ -23,6 +24,12 @@ export async function create(req, res) {
 
     if (!ticket) {
       return res.status(404).json({ error: 'ticket not found' });
+    }
+
+    // Writing a note is working the case, so the same department rule applies
+    // as for updating or escalating. See src/middleware/permissions.js.
+    if (!(await canActOnTicket(req.user, ticket))) {
+      return res.status(403).json({ error: 'this ticket belongs to another department' });
     }
 
     // Same rule as everywhere else in this system: a closed ticket is final.
@@ -49,6 +56,10 @@ export async function create(req, res) {
 }
 
 // R — GET /tickets/:ticketId/comments
+//
+// No department check here. Reading stays open, same as listing tickets: an
+// agent taking a transferred call needs the case history before speaking to
+// the customer, whichever queue it started in.
 export async function list(req, res) {
   const { ticketId } = req.params;
 
