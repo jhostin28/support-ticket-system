@@ -6,12 +6,13 @@
 
 import * as ticketsService from '../services/tickets.js';
 import * as usersService from '../services/users.js';
+import { canActOnTicket } from '../middleware/permissions.js';
 
 // POST /tickets — create one ticket.
 export async function create(req, res) {
   const { title, description, priority, clientId } = req.body || {};
 
-  // Only these two are required from the client. Everything else is either
+  // Only these three are required from the client. Everything else is either
   // defaulted by the database or resolved from the token below.
   if (!title || !description || !clientId) {
     return res.status(400).json({
@@ -74,6 +75,11 @@ export async function create(req, res) {
 //
 // Express puts them in req.query. They are optional by nature: none, one or
 // all three. Sending none returns every ticket.
+//
+// Reading is not restricted by department, unlike writing. An agent taking a
+// transferred call needs to see the case history before speaking to the
+// customer, even if it started in another queue. ?departmentId= narrows it
+// when they want only their own.
 export async function list(req, res) {
   const { status, departmentId, clientId } = req.query;
 
@@ -135,9 +141,10 @@ export async function getOne(req, res) {
 // What cannot be changed here:
 // - author_id and created_at: facts about the past.
 // - department_id: escalating also has to record who moved it and where from,
-//   so it gets its own endpoint with a transaction. Phase 3.
+//   so it gets its own endpoint with a transaction.
 // - user_id directly: an agent claims a ticket for themselves with
-//   { "claim": true }. Assigning someone else is a supervisor action, phase 4.
+//   { "claim": true }. Assigning someone else is a supervisor action and does
+//   not exist yet.
 export async function update(req, res) {
   const { id } = req.params;
   const { title, description, status, priority, claim } = req.body || {};
@@ -147,6 +154,12 @@ export async function update(req, res) {
 
     if (!existing) {
       return res.status(404).json({ error: 'ticket not found' });
+    }
+
+    // Department-level permission. 403 and not 404: the ticket exists and the
+    // caller is identified — they are simply not allowed to work this queue.
+    if (!(await canActOnTicket(req.user, existing))) {
+      return res.status(403).json({ error: 'this ticket belongs to another department' });
     }
 
     // A closed ticket is final — the rule this system took from how support
@@ -216,6 +229,12 @@ export async function escalate(req, res) {
 
     if (!ticket) {
       return res.status(404).json({ error: 'ticket not found' });
+    }
+
+    // You can only escalate out of your own queue. Without this an agent
+    // could shove another department's backlog somewhere else.
+    if (!(await canActOnTicket(req.user, ticket))) {
+      return res.status(403).json({ error: 'this ticket belongs to another department' });
     }
 
     if (ticket.status === 'closed') {

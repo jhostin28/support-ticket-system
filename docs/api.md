@@ -3,7 +3,21 @@
 Base URL: `http://localhost:3000`
 
 All request and response bodies are JSON. Endpoints marked **Auth** require an
-`Authorization: Bearer <token>` header.
+`Authorization: Bearer <token>` header. Some also require a role or a
+department match — noted per endpoint.
+
+## Permissions in short
+
+| | Rule |
+|---|---|
+| Reading | Any authenticated user |
+| Writing to a ticket | The ticket must be in your department |
+| Supervisors | Can write to any ticket |
+| Creating departments and users | Supervisors only |
+
+Reading is open because an agent taking a transferred call needs the case
+history before speaking to the customer, whichever queue it started in.
+Writing is not: a mobile agent has no business closing a washing-machine case.
 
 ---
 
@@ -64,7 +78,8 @@ Send it on every protected request as a header:
 
 ### `GET /api/departments`
 
-Lists every department, ordered by id.
+Lists every department, ordered by id. Open — department names are internal
+queue labels, harmless to read.
 
 **Response `200`**
 
@@ -76,7 +91,7 @@ Lists every department, ordered by id.
 ]
 ```
 
-### `POST /api/departments` — **Auth**
+### `POST /api/departments` — **Auth, supervisor only**
 
 **Body**
 
@@ -96,16 +111,23 @@ Lists every department, ordered by id.
 |---|---|
 | `400` | `name` missing |
 | `401` | No token, or the token is invalid or expired |
+| `403` | The caller is not a supervisor |
 | `409` | A department with that name already exists |
 
 ---
 
 ## Users
 
-Agents and supervisors. Clients do not have accounts — they call, and an agent
-creates the ticket for them.
+Agents and supervisors — the people who work in the system. Clients are a
+separate resource and have no accounts.
 
-### `POST /api/users`
+### `POST /api/users` — **Auth, supervisor only**
+
+Restricted because without it any agent could create an account with
+`role: supervisor` and promote themselves.
+
+On a fresh install there is no supervisor to create the first one, so
+`npm run seed` creates it from the terminal instead.
 
 The password is sent in plain text over the request and hashed with bcrypt
 before it reaches the database. It is never returned in any response.
@@ -144,6 +166,8 @@ before it reaches the database. It is never returned in any response.
 | Status | When |
 |---|---|
 | `400` | A required field is missing, or `departmentId` does not exist |
+| `401` | No token, or the token is invalid or expired |
+| `403` | The caller is not a supervisor |
 | `409` | A user with that email already exists |
 
 ---
@@ -152,6 +176,9 @@ before it reaches the database. It is never returned in any response.
 
 The people who report problems. They have no account and never log in — an
 agent registers them and opens tickets on their behalf.
+
+Any agent can register a client: it is routine work, unlike creating an
+employee account.
 
 ### `GET /api/clients` — **Auth**
 
@@ -207,6 +234,8 @@ filled in by the database.
 
 Lists tickets, ordered by priority (high first) and then by creation date
 (oldest first), so an old low-priority ticket is not left behind forever.
+
+Not restricted by department. Use `?departmentId=` to see only your own.
 
 **Query parameters** — all optional, combinable:
 
@@ -293,7 +322,7 @@ Not accepted from the client, and why:
 | `400` | A required field is missing, `clientId` does not exist, or `priority` is not a valid value |
 | `401` | No token, or the token is invalid or expired |
 
-### `PATCH /api/tickets/:id` — **Auth**
+### `PATCH /api/tickets/:id` — **Auth, same department**
 
 Updates only the fields sent. Anything left out stays as it is.
 
@@ -334,10 +363,11 @@ change.
 |---|---|
 | `400` | An invalid value for `status`, `priority` or the id |
 | `401` | No token, or the token is invalid or expired |
+| `403` | The ticket is in another department and the caller is not a supervisor |
 | `404` | No ticket with that id |
 | `409` | The ticket is closed, and a closed ticket cannot be modified |
 
-### `POST /api/tickets/:id/escalate` — **Auth**
+### `POST /api/tickets/:id/escalate` — **Auth, same department**
 
 Moves a ticket to another department and records the move.
 
@@ -363,6 +393,7 @@ the token — not from the request.
 |---|---|
 | `400` | `toDepartmentId` missing, or that department does not exist |
 | `401` | No token, or the token is invalid or expired |
+| `403` | The ticket is in another department and the caller is not a supervisor |
 | `404` | No ticket with that id |
 | `409` | The ticket is closed, or it is already in that department |
 
@@ -401,7 +432,10 @@ Oldest first — a case history read backwards makes no sense.
 | `401` | No token, or the token is invalid or expired |
 | `404` | No ticket with that id |
 
-### `POST /api/tickets/:ticketId/comments` — **Auth**
+### `POST /api/tickets/:ticketId/comments` — **Auth, same department**
+
+Writing a note is working the case, so the department rule applies — unlike
+reading them.
 
 **Body**
 
@@ -420,6 +454,7 @@ name.
 |---|---|
 | `400` | `body` missing, or the ticket id is not a number |
 | `401` | No token, or the token is invalid or expired |
+| `403` | The ticket is in another department and the caller is not a supervisor |
 | `404` | No ticket with that id |
 | `409` | The ticket is closed, and a closed ticket takes no new comments |
 
@@ -433,6 +468,7 @@ name.
 | `201` | Request succeeded and something new exists |
 | `400` | The request itself is wrong — missing or invalid data |
 | `401` | Not identified: no token, bad token, or bad credentials |
+| `403` | Identified, but not allowed to do this |
 | `404` | The thing being looked up does not exist |
 | `409` | The request is valid but clashes with existing data or state |
 | `500` | Something unexpected broke. Detail goes to the server log only |
