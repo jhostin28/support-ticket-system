@@ -1,5 +1,7 @@
 # support-ticket-system
 
+![CI](https://github.com/jhostin28/support-ticket-system/actions/workflows/ci.yml/badge.svg)
+
 REST API for a support ticket system, built to learn backend fundamentals from
 the ground up.
 
@@ -26,7 +28,8 @@ traded away.
 - **PostgreSQL**, accessed through the `pg` driver with hand-written SQL rather
   than an ORM, so the queries stay visible
 - **Express** with JWT authentication and bcrypt password hashing
-- **Docker** and **GitHub Actions** — added at the end, once the core is solid
+- **Vitest** and **Supertest** for integration tests
+- **Docker** and **GitHub Actions**
 
 No Redis, no elaborate frontend, no payments. Those get added only if a real
 problem justifies them — and if one does, the phase that justifies it is the
@@ -40,10 +43,10 @@ A phase is not a topic — it is a slice of the system that works end to end.
 |---|---|---|
 | 0 | Data model design | Done |
 | 1 | Database, departments, users, JWT login | Done |
-| 2 | Tickets and clients CRUD | Not started |
-| 3 | Comments and escalation | Not started |
-| 4 | Role-based permissions | Not started |
-| 5 | Tests, Docker and CI/CD | Not started |
+| 2 | Tickets and clients CRUD | Done |
+| 3 | Comments and escalation | Done |
+| 4 | Role and department permissions | Done |
+| 5 | Tests, Docker and CI | Done |
 | 6 | Load testing with k6, indexes | Not started |
 | 7 | Observability: structured logs, metrics, dashboard | Not started |
 | 8 | Incident engineering and postmortems | Not started |
@@ -54,8 +57,8 @@ A phase is not a topic — it is a slice of the system that works end to end.
 Phases 0 to 5 build the application. Phases 6 to 11 are about operating it —
 measuring it, breaking it on purpose, and running it somewhere real.
 
-This plan will change as the project is built. Phases get adjusted when
-building one reveals something the plan did not anticipate.
+This plan changes as the project is built. Phases get adjusted when building
+one reveals something the plan did not anticipate.
 
 ## Documentation
 
@@ -63,9 +66,28 @@ building one reveals something the plan did not anticipate.
   reasoning behind each decision, including the trade-offs
 - [API reference](docs/api.md) — every endpoint, what it takes and what it
   returns
-- [Phase 1](docs/phase-1.md) — auth, layering and error handling decisions
+- [Phase 1](docs/phase-1.md) — auth, layering and error handling
+- [Phase 2](docs/phase-2.md) — tickets, business rules and the first trigger
+- [Phase 3](docs/phase-3.md) — comments, escalation and transactions
+- [Phase 4](docs/phase-4.md) — role and department permissions
+- [Phase 5](docs/phase-5.md) — tests, Docker and CI
 
-## Running it locally
+## Running it
+
+### With Docker
+
+Everything in one command. No Node or PostgreSQL needed on the machine.
+
+```
+git clone https://github.com/jhostin28/support-ticket-system.git
+cd support-ticket-system
+export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
+docker compose up --build
+```
+
+The schema is applied automatically the first time the database starts.
+
+### Without Docker
 
 Requires Node.js and PostgreSQL.
 
@@ -75,20 +97,34 @@ cd support-ticket-system
 npm install
 ```
 
-Create the database and run `sql/schema.sql` against it.
+Create a database and run `sql/schema.sql` against it.
 
 Copy `.env.example` to `.env` and fill it in. `JWT_SECRET` should be a long
-random string, which this will generate:
+random string:
 
 ```
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-Then start it:
+Then:
 
 ```
+npm run seed    # creates three departments and the first supervisor
 npm run dev
 ```
+
+The seed script exists because creating users requires a supervisor, which
+leaves no way to create the first one through the API.
+
+### Tests
+
+```
+npm test
+```
+
+21 integration tests against a separate database. They need
+`support_ticket_system_test` to exist with the schema applied, and a
+`.env.test` pointing at it.
 
 ## What the system does
 
@@ -96,8 +132,11 @@ npm run dev
 - Create a ticket
 - Change a ticket's status: pending, in progress, resolving, closed
 - Edit ticket information
-- Assign or escalate tickets between departments
+- Escalate tickets between departments, with a record of each move
 - Add comments to a case
 
 Clients do not log in. A client calls, and an agent creates the ticket on their
 behalf — the same model I worked in. Only agents and supervisors have accounts.
+
+Agents work tickets in their own department; supervisors work any ticket and
+are the only ones who can create departments and user accounts.
