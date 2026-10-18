@@ -10,7 +10,7 @@
 import { Router } from 'express';
 
 import * as departmentsController from '../controllers/departments.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -23,16 +23,16 @@ const router = Router();
 // called now; Express is being handed the function to run when a matching
 // request arrives — the same idea as a callback.
 
-// Listing stays open for now.
+// Listing stays open: department names are internal queue labels, harmless
+// to read.
 router.get('/', departmentsController.list);
 
-// requireAuth goes BEFORE the controller, and the order is what makes it work:
-// Express runs them left to right, so if the middleware does not call next(),
-// the controller never runs. See src/middleware/auth.js.
+// Middleware runs left to right, and the order is not optional: requireAuth
+// sets req.user from the token, then requireRole reads it. If either one does
+// not call next(), the controller never runs.
 //
-// Protection is declared here rather than inside the controller: which routes
-// need a token is a routing decision, and the controller never even learns a
-// check happened.
-router.post('/', requireAuth, departmentsController.create);
+// Creating a department is a supervisor action — it changes how the whole
+// organisation is structured, not just one case.
+router.post('/', requireAuth, requireRole('supervisor'), departmentsController.create);
 
 export default router;
