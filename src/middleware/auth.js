@@ -58,3 +58,26 @@ export function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'invalid or expired token' });
   }
 }
+
+// Require a specific role.
+//
+// A factory: it does not check anything itself, it returns a middleware that
+// does. That is what lets the role be named at the route:
+//   router.post('/', requireAuth, requireRole('supervisor'), controller.create)
+//
+// Without this shape, a separate middleware per role would be needed.
+//
+// It assumes requireAuth ran first and set req.user — which is why order
+// matters in the route.
+export function requireRole(role) {
+  return (req, res, next) => {
+    if (req.user.role !== role) {
+      // 403, not 401. The caller IS identified — the token was valid and
+      // requireAuth let them through. They simply are not allowed to do this.
+      // 401 would mean "log in", which would not help here.
+      return res.status(403).json({ error: 'this action requires a supervisor' });
+    }
+
+    next();
+  };
+}
