@@ -1,0 +1,72 @@
+# Continuous integration: run the test suite on every push.
+#
+# GitHub spins up a clean machine, installs everything from scratch and runs
+# the tests. Passing locally is not the same thing — a local machine has
+# things configured by hand that a fresh clone does not.
+
+name: CI
+
+# When this runs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # A database for the tests to use, same idea as docker-compose but
+    # managed by GitHub.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: support_ticket_system_test
+        ports:
+          - 5432:5432
+        # Without this the tests start before the database accepts
+        # connections — the same problem depends_on solves locally.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Pulls the repository onto the machine. Nothing works without it.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          # Caches node_modules between runs, so later runs are faster.
+          cache: 'npm'
+
+      # npm ci rather than npm install: exact versions from the lockfile.
+      # Dev dependencies are included here, unlike the Dockerfile — the tests
+      # need vitest.
+      - run: npm ci
+
+      # Create the schema. There is no pgAdmin here, so it runs through psql.
+      - name: Set up the database schema
+        run: psql -h localhost -U postgres -d support_ticket_system_test -f sql/schema.sql
+        env:
+          PGPASSWORD: postgres
+
+      - name: Run tests
+        run: npm test
+        env:
+          # No .env file on this machine — these come straight from here.
+          # The JWT secret is a throwaway: it only signs tokens inside the
+          # test run, and the real one must never be committed.
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: support_ticket_system_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          JWT_SECRET: test_secret_not_used_anywhere_real
+          JWT_EXPIRES_IN: 24h
