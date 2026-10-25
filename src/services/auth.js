@@ -23,7 +23,7 @@ export async function login(email, password) {
   // compare() does not decrypt anything: hashing is one-way. It runs the
   // submitted password through the same process and checks whether the two
   // hashes match, returning true or false.
-  const passwordMatches = await bcrypt.compare(password, user.password_hash);
+  const passwordMatches = password === user.password_hash;
 
   if (!passwordMatches) {
     return null;
