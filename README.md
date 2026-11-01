@@ -47,18 +47,44 @@ A phase is not a topic — it is a slice of the system that works end to end.
 | 3 | Comments and escalation | Done |
 | 4 | Role and department permissions | Done |
 | 5 | Tests, Docker and CI | Done |
-| 6 | Load testing with k6, indexes | Not started |
-| 7 | Observability: structured logs, metrics, dashboard | Not started |
-| 8 | Incident engineering and postmortems | Not started |
-| 9 | Deployment on AWS | Not started |
-| 10 | High availability: load balancer, two instances | Not started |
-| 11 | Backups and a tested restore | Not started |
+| 6 | Database migrations | Not started |
+| 7 | API documentation with Swagger | Not started |
+| 8 | Minimal frontend: HTML, CSS, JS | Not started |
+| 9 | Local deployment: Ubuntu Server, Nginx, systemd | Not started |
+| 10 | Pagination, file uploads, email notifications | Not started |
+| 11 | Load testing with k6, indexes | Not started |
+| 12 | Observability: structured logs, metrics, dashboard | Not started |
+| 13 | Incident engineering and postmortems | Not started |
+| 14 | Deployment on AWS | Not started |
+| 15 | High availability and tested backups | Not started |
 
-Phases 0 to 5 build the application. Phases 6 to 11 are about operating it —
-measuring it, breaking it on purpose, and running it somewhere real.
+Phases 0 to 9 build the application and get it running on a real server.
+Phases 10 to 15 are about operating it — measuring it, breaking it on purpose,
+and running it somewhere public.
+
+**Phases 6 to 9 came from job postings, not from a plan.** The original
+roadmap jumped from CI straight to the cloud, and left out things that come up
+in almost every listing here: migrations, API documentation, basic HTML and
+CSS, and deploying to a server by hand. A posting asking for "Windows Server /
+IIS or Linux for local application deployment" is what exposed the gap. The
+roadmap now gets revised against real listings rather than against an idea of
+what a portfolio should look like.
+
+Deliberately out of scope: porting to MySQL or SQL Server. It would be rework
+with nothing new learned — that belongs in a separate SQL practice repo.
 
 This plan changes as the project is built. Phases get adjusted when building
 one reveals something the plan did not anticipate.
+
+## Troubleshooting log
+
+The project was built in a straight line and almost nothing broke, which left
+no real debugging experience behind. So faults are now introduced on purpose,
+on throwaway `chaos/` branches, and diagnosed from the symptom alone — no
+looking at the diff.
+
+Each one is written up in its phase document: symptom, how it was diagnosed,
+root cause, fix, and what was missing that let it happen.
 
 ## Documentation
 
